@@ -1,0 +1,81 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+<div class="module">
+  <h2>Résumé</h2>
+  <p><strong>Sessions actives :</strong> {{ total_active_sessions }}</p>
+  <p><strong>Utilisateurs en ligne :</strong> {{ online_users|length }}</p>
+</div>
+
+<div class="module">
+  <h2>Utilisateurs en ligne</h2>
+  {% if online_users %}
+    <ul>
+      {% for user in online_users %}
+        <li>{{ user }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Aucun utilisateur en ligne.</p>
+  {% endif %}
+</div>
+
+<div class="module">
+  <h2>Sessions détaillées</h2>
+  {% if sessions %}
+    <table class="adminlist">
+      <thead>
+        <tr>
+          <th>Session</th>
+          <th>User</th>
+          <th>Login</th>
+          <th>Dernière activité</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+          <tr>
+            <td><code>{{ s.session_id }}</code></td>
+            <td>{{ s.user_id }}</td>
+            <td>{{ s.login_time_dt|default:s.login_time }}</td>
+            <td>{{ s.last_activity_dt|default:s.last_activity }}</td>
+            <td>{{ s.status }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Aucune session active.</p>
+  {% endif %}
+</div>
+
+<div class="module">
+  <h2>Classement activité</h2>
+  {% if leaderboard %}
+    <table class="adminlist">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in leaderboard %}
+          <tr>
+            <td>{{ row.user_id }}</td>
+            <td>{{ row.score }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Pas de données de score (ACTIVITY_SCORE_ENABLED=0 ou aucune activité).</p>
+  {% endif %}
+</div>
+{% endblock %}
