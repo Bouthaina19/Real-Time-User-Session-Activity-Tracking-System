@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Staff Ticket Management</title>
+  <title>Gestion Tickets — Staff</title>
   <style>
     /* Palette sobre et contrastée pour usage sous pression */
     :root {
@@ -206,21 +206,21 @@
 
   <header>
     <div>
-      <div class="title">Staff Ticket Management</div>
+      <div class="title">Gestion des tickets (Staff)</div>
       <div class="status-text" id="status-text">En attente...</div>
     </div>
     <div class="controls">
       <div class="pill" id="pill-date">📅 <span id="today-date"></span></div>
       <div class="pill" id="pill-open"><span class="dot"></span><span id="service-status">-</span></div>
-      <div class="pill" id="pill-redis"><span class="dot"></span>Redis live</div>
+      <div class="pill" id="pill-redis"><span class="dot"></span>Redis en direct</div>
     </div>
   </header>
 
   <main>
     <div class="card">
-      <h2>Now Serving</h2>
+      <h2>Ticket en cours</h2>
       <div class="now-serving">
-        <div class="now-label">Ticket en cours</div>
+        <div class="now-label">En cours</div>
         <div class="now-ticket" id="now-ticket">-</div>
         <div class="now-time" id="now-time">--:--</div>
       </div>
@@ -230,12 +230,11 @@
       <div class="card">
         <h2>Contrôles</h2>
         <div class="actions">
-          <button class="btn green" id="btn-start">▶️ Start Day</button>
-          <button class="btn blue" id="btn-call">🔔 Call Next</button>
-          <button class="btn amber" id="btn-finish">✅ Finish Current</button>
-          <button class="btn red" id="btn-end">⏹️ End Day</button>
+          <button class="btn green" id="btn-start">▶️ Démarrer la journée</button>
+          <button class="btn blue" id="btn-call">🔔 Appeler le suivant</button>
+          <button class="btn amber" id="btn-finish">✅ Clôturer le ticket</button>
+          <button class="btn red" id="btn-end">⏹️ Terminer la journée</button>
         </div>
-        <small class="status-text">Actions écrivent directement dans Redis (LIST/HASH/STRING) et loguent les événements.</small>
       </div>
       <div class="card">
         <h2>Vue file</h2>
@@ -266,7 +265,7 @@
     </div>
   </main>
 
-  <footer>Interface staff temps réel — Redis uniquement (pas de SQL).</footer>
+  <footer>Interface staff temps réel</footer>
 
   <script>
     // Séparation JS pour clarté : fetch snapshot, binder actions, afficher Redis en direct.

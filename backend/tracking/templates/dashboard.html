@@ -352,11 +352,11 @@
   <header>
     <div class="header-left">
       <div class="title">Tickets — Poste</div>
-      <div class="subtitle">Dashboard pédagogique (Redis temps réel)</div>
+      <div class="subtitle">Dashboard pédagogique</div>
       <div class="header-meta">
         <div class="pill" id="pill-date">📅 <span id="today-date"></span></div>
         <div class="pill" id="pill-open"><span class="dot"></span><span id="service-status">-</span></div>
-        <div class="pill" id="pill-redis" title="Redis est le moteur en direct"><span class="dot"></span>Redis live</div>
+        <div class="pill" id="pill-redis" title="Redis est le moteur en direct"><span class="dot"></span>Redis en direct</div>
       </div>
     </div>
     <div class="controls">
@@ -421,7 +421,6 @@
           <button class="action-btn amber" id="btn-finish">✅ Clôturer en cours</button>
           <button class="action-btn red" id="btn-end">⏹️ Fin de journée</button>
         </div>
-        <small>Ces actions écrivent directement dans Redis (LIST/CURRENT + logs).</small>
       </div>
     </div>
 
@@ -442,7 +441,7 @@
   </main>
 
   <footer>
-    Dashboard pédagogique NoSQL : Redis est le moteur unique (pas de SQL). UI simple, réactive et responsive.
+    Dashboard pédagogique
   </footer>
 
   <script>
@@ -518,6 +517,12 @@
         }
         list.forEach((item, idx) => {
           const status = item.status || "waiting";
+          const statusLabelMap = {
+            waiting: "en attente",
+            in_progress: "en cours",
+            completed: "terminé"
+          };
+          const displayStatus = statusLabelMap[status] || status.replace("_"," ");
           const cls = [
             "queue-item",
             idx === 0 ? "next" : "",
@@ -533,13 +538,10 @@
                   <div class="meta">${created}</div>
                 </div>
               </div>
-              <div class="status-pill ${status}">${status.replace("_", " ")}</div>
+              <div class="status-pill ${status}">${displayStatus}</div>
             </div>
           `;
         });
-        const maxQueue = Math.max(data.waiting_tickets || 0, 1);
-        const pct = Math.min(100, Math.round(((data.waiting_tickets || 0) / maxQueue) * 100));
-        document.getElementById("queue-bar").style.width = `${pct}%`;
       }
 
       function renderLogs(data) {
