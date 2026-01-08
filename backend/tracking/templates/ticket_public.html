@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prendre un ticket</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --accent-2: #06b6d4;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    }
+    h1 { margin: 0 0 12px; }
+    .btn {
+      width: 100%;
+      padding: 12px 14px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(37,99,235,0.18);
+    }
+    .btn:disabled { opacity: 0.7; cursor: not-allowed; }
+    .pill {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: #f9fafb;
+      font-size: 13px;
+    }
+    .ticket {
+      margin-top: 14px;
+      padding: 16px;
+      background: #fff;
+      color: #111827;
+      border-radius: 12px;
+      text-align: center;
+      font-weight: 800;
+      font-size: 28px;
+      letter-spacing: 2px;
+      box-shadow: inset 0 0 0 2px #e5e7eb;
+    }
+    .row { margin: 10px 0; color: var(--muted); }
+    select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    .toast {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      background: #10b981;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      box-shadow: 0 12px 30px rgba(16,185,129,0.25);
+      font-weight: 700;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.25s ease;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .subtext { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .closed-banner {
+      margin-top: 12px;
+      padding: 14px;
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      font-weight: 700;
+      text-align: center;
+      display: none;
+    }
+    .closed-banner.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="pill">Service public — Prendre un ticket</div>
+    <h1>Bienvenue</h1>
+    <div style="margin-bottom:12px; color: var(--muted);">Service: Poste</div>
+
+    <button class="btn" id="btn-ticket">Prendre un ticket</button>
+
+    <div id="ticket-area" style="margin-top:16px;">
+      <div class="ticket" id="ticket-number">---</div>
+      <div class="row">Personnes avant vous : <span id="before">-</span></div>
+      <div class="row">Ticket en cours : <span id="current">-</span></div>
+    </div>
+    <div class="closed-banner" id="closed-banner">Service fermé, revenez demain.</div>
+  </div>
+  <div class="toast" id="toast">Ticket pris !</div>
+
+  <script>
+    const btn = document.getElementById("btn-ticket");
+    const ticketNumberEl = document.getElementById("ticket-number");
+    const beforeEl = document.getElementById("before");
+    const currentEl = document.getElementById("current");
+    const toastEl = document.getElementById("toast");
+    const closedBanner = document.getElementById("closed-banner");
+    let isOpen = true;
+    let hasTicket = false;
+
+    // Son simple de confirmation (bip léger)
+    const audioEl = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YRAAAAAg//8A//8A//8A//8A//8A//8A//8A//8A");
+    function playTone() {
+      try { audioEl.currentTime = 0; audioEl.play(); } catch (e) {}
+    }
+
+    function showToast(message) {
+      toastEl.textContent = message;
+      toastEl.classList.add("show");
+      setTimeout(() => toastEl.classList.remove("show"), 2000);
+    }
+
+    let pollTimer = null;
+    async function refreshStatus() {
+      try {
+        const res = await fetch("/api/tickets/status");
+        const data = await res.json();
+        isOpen = data.open !== false;
+        const waitingRaw = data.waiting_tickets ?? 0;
+        const displayWaiting = hasTicket ? Math.max(waitingRaw - 1, 0) : waitingRaw;
+        beforeEl.textContent = displayWaiting;
+        currentEl.textContent = data.current_ticket ?? "-";
+        btn.disabled = !isOpen;
+        closedBanner.classList.toggle("show", !isOpen);
+        if (!isOpen) {
+          ticketNumberEl.textContent = "Fermé";
+          hasTicket = false;
+        }
+        if (isOpen && ticketNumberEl.textContent === "Fermé") {
+          ticketNumberEl.textContent = "---";
+          hasTicket = false;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    function startPolling() {
+      stopPolling();
+      refreshStatus();
+      pollTimer = setInterval(refreshStatus, 1000);
+    }
+    function stopPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    btn.addEventListener("click", async () => {
+      if (!isOpen) {
+        showToast("Service fermé, revenez demain");
+        return;
+      }
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/tickets/take", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (data.closed) {
+          showToast(data.message || "Service fermé, revenez demain");
+        } else {
+          ticketNumberEl.textContent = data.ticket?.ticket_number ?? "---";
+          beforeEl.textContent = data.waiting_before ?? "-";
+          hasTicket = true;
+          showToast("Ticket pris. Patientez, écoutez l’appel.");
+          playTone();
+          await refreshStatus();
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    startPolling();
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stopPolling();
+      else startPolling();
+    });
+  </script>
+</body>
+</html>

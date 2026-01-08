@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Tickets — Temps réel Redis</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* Palette douce et pédagogique */
+    :root {
+      --bg: #f7f9fc;
+      --card: #ffffff;
+      --card-strong: #0f172a;
+      --accent: #2563eb;
+      --accent-2: #06b6d4;
+      --accent-3: #f59e0b;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+      --success: #16a34a;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 10% 20%, rgba(37,99,235,0.08), transparent 25%),
+                  radial-gradient(circle at 90% 10%, rgba(6,182,212,0.08), transparent 28%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Layout */
+    header {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(6,182,212,0.10));
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(10px);
+    }
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .title {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .header-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .pill {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 12px;
+      color: var(--muted);
+      background: #fff;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow);
+    }
+    .pill .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--muted);
+      display: inline-block;
+    }
+    .pill.green .dot { background: var(--success); }
+    .pill.red .dot { background: var(--danger); }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    button, select, label input { font: inherit; }
+    .btn {
+      background: linear-gradient(135deg, #2563eb, #06b6d4);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      font-weight: 700;
+      letter-spacing: 0.1px;
+      box-shadow: 0 16px 30px rgba(37,99,235,0.2);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 18px 36px rgba(37,99,235,0.22); }
+    .btn.secondary {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      box-shadow: none;
+    }
+    main {
+      padding: 24px 24px 40px;
+      display: grid;
+      gap: 18px;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin: 0 0 6px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    .card h2 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card small { color: var(--muted); }
+
+    /* KPI cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 12px;
+    }
+    .kpi {
+      border-radius: 14px;
+      padding: 14px;
+      background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(6,182,212,0.10));
+      border: 1px solid rgba(37,99,235,0.15);
+      display: grid;
+      gap: 6px;
+      box-shadow: var(--shadow);
+    }
+    .kpi .label { color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .kpi .value { font-size: 28px; font-weight: 800; letter-spacing: 0.4px; }
+    .kpi .sub { color: var(--muted); font-size: 12px; }
+
+    /* Queue timeline */
+    .queue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .queue-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: var(--shadow);
+      transition: transform 120ms ease;
+    }
+    .queue-item:hover { transform: translateX(2px); }
+    .queue-item .left { display: flex; align-items: center; gap: 10px; }
+    .queue-item .ticket {
+      width: 46px; height: 46px;
+      border-radius: 12px;
+      display: grid; place-items: center;
+      font-weight: 800;
+      background: rgba(37,99,235,0.08);
+      color: var(--accent);
+    }
+    .queue-item.current .ticket { background: rgba(22,163,74,0.12); color: var(--success); }
+    .queue-item.next .ticket { background: rgba(245,158,11,0.12); color: var(--warn); }
+    .queue-item .meta { font-size: 12px; color: var(--muted); }
+    .queue-item .status-pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(37,99,235,0.12);
+      color: var(--accent);
+    }
+    .status-pill.waiting { background: rgba(37,99,235,0.12); color: var(--accent); }
+    .status-pill.in_progress { background: rgba(22,163,74,0.14); color: var(--success); }
+    .status-pill.completed { background: rgba(100,116,139,0.14); color: #475569; }
+
+    /* Action buttons panel */
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    .action-btn {
+      border: none;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: var(--shadow);
+      transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+    }
+    .action-btn:hover { transform: translateY(-1px); box-shadow: 0 16px 36px rgba(0,0,0,0.12); }
+    .action-btn.green { background: linear-gradient(135deg, #16a34a, #22c55e); }
+    .action-btn.blue  { background: linear-gradient(135deg, #2563eb, #06b6d4); }
+    .action-btn.amber { background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #111827; }
+    .action-btn.red   { background: linear-gradient(135deg, #ef4444, #f87171); }
+
+    /* Redis insight */
+    .redis-box {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .redis-card {
+      border: 1px dashed var(--accent);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(37,99,235,0.06);
+      color: #0f172a;
+      box-shadow: var(--shadow);
+    }
+    .redis-card strong { color: var(--accent); }
+    .badge-soft {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(6,182,212,0.14);
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    /* Table styling reused for logs */
+    .rt-table-wrapper { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 560px;
+      color: #0f172a;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    th {
+      color: #334155;
+      background: #eef2ff;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+    }
+    code { color: var(--accent); }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+    footer {
+      padding: 16px 24px 24px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    /* Toasts */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #111827;
+      color: #fff;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 160ms ease, transform 160ms ease;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: #16a34a; }
+    .toast.info { background: #2563eb; }
+    .toast.warn { background: #f59e0b; color: #111827; }
+
+    /* Progress line (queue evolution) */
+    .progress {
+      height: 8px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      overflow: hidden;
+    }
+    .progress .bar {
+      height: 100%;
+      background: linear-gradient(90deg, #2563eb, #06b6d4);
+      width: 0%;
+      transition: width 200ms ease;
+    }
+
+    @media (max-width: 768px) {
+      header { flex-direction: column; align-items: flex-start; }
+      .controls { width: 100%; justify-content: flex-start; }
+    }
+  </style>
+</head>
+  <body>
+  <div id="toast" class="toast"></div>
+  <header>
+    <div class="header-left">
+      <div class="title">Tickets — Poste</div>
+      <div class="subtitle">Dashboard pédagogique (Redis temps réel)</div>
+      <div class="header-meta">
+        <div class="pill" id="pill-date">📅 <span id="today-date"></span></div>
+        <div class="pill" id="pill-open"><span class="dot"></span><span id="service-status">-</span></div>
+        <div class="pill" id="pill-redis" title="Redis est le moteur en direct"><span class="dot"></span>Redis live</div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn secondary" id="rt-refresh">↻ Rafraîchir</button>
+      <label class="pill">
+        Auto
+        <input type="checkbox" id="rt-auto" checked />
+      </label>
+      <label class="pill">
+        Intervalle
+        <select id="rt-interval">
+          <option value="3">3s</option>
+          <option value="5" selected>5s</option>
+          <option value="10">10s</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <main>
+    <div>
+      <div class="section-title">Vue d’ensemble</div>
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="label">🎟️ Ticket en cours</div>
+          <div class="value" id="kpi-current">-</div>
+          <div class="sub" id="kpi-current-sub">En attente d’ouverture</div>
+        </div>
+        <div class="kpi">
+          <div class="label">⏳ En attente</div>
+          <div class="value" id="kpi-waiting">-</div>
+          <div class="sub">Personnes dans la file</div>
+        </div>
+        <div class="kpi">
+          <div class="label">🧾 Total du jour</div>
+          <div class="value" id="kpi-total">-</div>
+          <div class="sub">Tickets générés aujourd’hui</div>
+        </div>
+        <div class="kpi">
+          <div class="label">⏱️ Attente moyenne</div>
+          <div class="value" id="kpi-avg">-</div>
+          <div class="sub">Basé sur les tickets en file</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>File d’attente</h2>
+        <div class="progress"><div class="bar" id="queue-bar"></div></div>
+        <div class="queue-list" id="queue-list">
+          <div class="empty">Chargement...</div>
+        </div>
+        <small>Les tickets proviennent de Redis LIST (FIFO) avec métadonnées en HASH.</small>
+      </div>
+
+      <div class="card">
+        <h2>Actions staff</h2>
+        <div class="actions">
+          <button class="action-btn green" id="btn-start">▶️ Démarrer journée</button>
+          <button class="action-btn blue" id="btn-call">🔔 Appeler suivant</button>
+          <button class="action-btn amber" id="btn-finish">✅ Clôturer en cours</button>
+          <button class="action-btn red" id="btn-end">⏹️ Fin de journée</button>
+        </div>
+        <small>Ces actions écrivent directement dans Redis (LIST/CURRENT + logs).</small>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Logs tickets</h2>
+        <div class="rt-table-wrapper" id="tk-logs-wrapper">
+          <div class="empty">Chargement...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Evolution de la file</h2>
+        <canvas id="tk-chart" height="140"></canvas>
+        <small>Mise à jour en direct depuis Redis (snapshot).</small>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    Dashboard pédagogique NoSQL : Redis est le moteur unique (pas de SQL). UI simple, réactive et responsive.
+  </footer>
+
+  <script>
+    (function() {
+      const ticketsUrl = "/api/tickets/snapshot";
+      const actionUrls = {
+        start: "/api/tickets/start-day",
+        end: "/api/tickets/end-day",
+        call: "/api/tickets/call-next",
+        finish: "/api/tickets/finish-current",
+      };
+      const refreshBtn = document.getElementById("rt-refresh");
+      const autoChk = document.getElementById("rt-auto");
+      const intervalSel = document.getElementById("rt-interval");
+      const statusEl = document.getElementById("rt-status");
+      const toastEl = document.getElementById("toast");
+
+      const state = {
+        snapshot: null,
+        chart: null,
+        points: []
+      };
+      let timer = null;
+
+      function toast(message, type="info") {
+        toastEl.textContent = message;
+        toastEl.className = "toast show " + type;
+        setTimeout(() => { toastEl.classList.remove("show"); }, 2200);
+      }
+      function setStatus(text) { statusEl ? statusEl.textContent = text : null; }
+
+      function formatSeconds(sec) {
+        if (sec == null) return "-";
+        const m = Math.floor(sec / 60);
+        const s = Math.round(sec % 60);
+        return `${m}m ${s}s`;
+      }
+
+      function renderHeader(data) {
+        const isOpen = data.open !== false;
+        document.getElementById("today-date").textContent = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long" });
+        const pillOpen = document.getElementById("pill-open");
+        pillOpen.classList.remove("green", "red");
+        pillOpen.classList.add(isOpen ? "green" : "red");
+        document.getElementById("service-status").textContent = isOpen ? "Ouvert" : "Fermé";
+
+        const pillRedis = document.getElementById("pill-redis");
+        pillRedis.classList.remove("green", "red");
+        pillRedis.classList.add(data ? "green" : "red");
+      }
+
+      function renderKpi(data) {
+        const isOpen = data.open !== false;
+        document.getElementById("kpi-current").textContent = isOpen ? (data.current_ticket ?? "—") : "Fermé";
+        document.getElementById("kpi-current-sub").textContent = isOpen ? `Suivant : ${data.next_ticket ?? "—"}` : "Démarrez la journée pour ouvrir";
+        document.getElementById("kpi-waiting").textContent = data.waiting_tickets ?? 0;
+        document.getElementById("kpi-total").textContent = data.total_tickets ?? 0;
+        document.getElementById("kpi-avg").textContent = formatSeconds(data.avg_wait_seconds);
+      }
+
+      function renderQueue(data) {
+        const wrap = document.getElementById("queue-list");
+        const isOpen = data.open !== false;
+        const list = data.waiting_list || [];
+        wrap.innerHTML = "";
+        if (!isOpen) {
+          wrap.innerHTML = '<div class="empty">Service fermé.</div>';
+          return;
+        }
+        if (!list.length) {
+          wrap.innerHTML = '<div class="empty">Aucun ticket en attente.</div>';
+          return;
+        }
+        list.forEach((item, idx) => {
+          const status = item.status || "waiting";
+          const cls = [
+            "queue-item",
+            idx === 0 ? "next" : "",
+            data.current_ticket && String(item.ticket_number) === String(data.current_ticket) ? "current" : ""
+          ].join(" ");
+          const created = item.creation_time_iso || item.creation_time || "";
+          wrap.innerHTML += `
+            <div class="${cls}">
+              <div class="left">
+                <div class="ticket">${item.ticket_number ?? "-"}</div>
+                <div>
+                  <div style="font-weight:700;">Ticket #${item.ticket_number ?? "-"}</div>
+                  <div class="meta">${created}</div>
+                </div>
+              </div>
+              <div class="status-pill ${status}">${status.replace("_", " ")}</div>
+            </div>
+          `;
+        });
+        const maxQueue = Math.max(data.waiting_tickets || 0, 1);
+        const pct = Math.min(100, Math.round(((data.waiting_tickets || 0) / maxQueue) * 100));
+        document.getElementById("queue-bar").style.width = `${pct}%`;
+      }
+
+      function renderLogs(data) {
+        const logsWrap = document.getElementById("tk-logs-wrapper");
+        const logs = data.logs || [];
+        if (!logs.length) {
+          logsWrap.innerHTML = '<div class="empty">Aucun log récent.</div>';
+        } else {
+          const rows = logs.map(l => `<tr><td><code>${l}</code></td></tr>`).join("");
+          logsWrap.innerHTML = `<table><thead><tr><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`;
+        }
+      }
+
+      function renderChart(data) {
+        const now = new Date();
+        state.points.push({
+          label: now.toLocaleTimeString(),
+          queue: data.waiting_tickets || 0,
+          total: data.total_tickets || 0,
+        });
+        if (state.points.length > 30) state.points.shift();
+
+        if (!state.chart) {
+          const ctx = document.getElementById("tk-chart").getContext("2d");
+          state.chart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: [],
+              datasets: [
+                { label: "File", data: [], borderColor: "#2563eb", fill: false, tension: 0.25 },
+                { label: "Total jour", data: [], borderColor: "#06b6d4", fill: false, tension: 0.25 },
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { labels: { color: "#0f172a" } } },
+              scales: {
+                x: { ticks: { color: "#64748b" } },
+                y: { beginAtZero: true, ticks: { color: "#64748b", stepSize: 1 } }
+              }
+            }
+          });
+        }
+        state.chart.data.labels = state.points.map(p => p.label);
+        state.chart.data.datasets[0].data = state.points.map(p => p.queue);
+        state.chart.data.datasets[1].data = state.points.map(p => p.total);
+        state.chart.update("none");
+      }
+
+      function renderRedis(data) {
+        const el = document.getElementById("redis-keys");
+        if (!el) return;
+        el.textContent = data.key_count ?? 0;
+      }
+
+      function renderSnapshot() {
+        const data = state.snapshot || {};
+        renderHeader(data);
+        renderKpi(data);
+        renderQueue(data);
+        renderLogs(data);
+        renderChart(data);
+        renderRedis(data);
+      }
+
+      async function fetchData() {
+        setStatus && setStatus("Chargement...");
+        try {
+          const res = await fetch(ticketsUrl);
+          state.snapshot = await res.json();
+          renderSnapshot();
+          setStatus && setStatus("Dernier rafraîchissement : " + new Date().toLocaleTimeString());
+        } catch (err) {
+          console.error(err);
+          setStatus && setStatus("Erreur de rafraîchissement");
+          toast("Erreur de rafraîchissement", "warn");
+        }
+      }
+
+      async function postAction(key) {
+        const btnMap = {
+          start: document.getElementById("btn-start"),
+          call: document.getElementById("btn-call"),
+          finish: document.getElementById("btn-finish"),
+          end: document.getElementById("btn-end"),
+        };
+        const btn = btnMap[key];
+        if (!btn) return;
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.style.opacity = 0.7;
+        btn.textContent = "⏳...";
+        try {
+          const res = await fetch(actionUrls[key], { method: "POST" });
+          const json = await res.json();
+          toast(`Action: ${label}`, "info");
+          await fetchData();
+        } catch (e) {
+          console.error(e);
+          toast("Erreur action", "warn");
+        } finally {
+          btn.disabled = false;
+          btn.style.opacity = 1;
+          btn.textContent = label;
+        }
+      }
+
+      function startAuto() {
+        stopAuto();
+        if (autoChk.checked) {
+          const interval = Math.max(2, parseInt(intervalSel.value || "5", 10)) * 1000;
+          timer = setInterval(fetchData, interval);
+        }
+      }
+      function stopAuto() {
+        if (timer) { clearInterval(timer); timer = null; }
+      }
+
+      refreshBtn.addEventListener("click", fetchData);
+      autoChk.addEventListener("change", startAuto);
+      intervalSel.addEventListener("change", startAuto);
+      document.getElementById("btn-start").addEventListener("click", () => postAction("start"));
+      document.getElementById("btn-call").addEventListener("click", () => postAction("call"));
+      document.getElementById("btn-finish").addEventListener("click", () => postAction("finish"));
+      document.getElementById("btn-end").addEventListener("click", () => postAction("end"));
+
+      fetchData();
+      startAuto();
+    })();
+  </script>
+</body>
+</html>

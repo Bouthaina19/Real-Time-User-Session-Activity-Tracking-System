@@ -1,9 +1,10 @@
 import json
 from django.http import JsonResponse, HttpRequest
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from . import session_service
+from . import ticket_service
 
 
 def _parse_body(request: HttpRequest) -> dict:
@@ -15,67 +16,66 @@ def _parse_body(request: HttpRequest) -> dict:
     return {}
 
 
-def _bad_request(message: str, status: int = 400) -> JsonResponse:
-    return JsonResponse({"error": message}, status=status)
+@require_http_methods(["GET"])
+def realtime_dashboard_page(request: HttpRequest):
+    """
+    Page autonome pour le suivi temps réel des tickets.
+    """
+    return render(request, "dashboard.html", {})
+
+
+# --------------------------
+# Ticketing (Redis queue)
+# --------------------------
+
+
+@require_http_methods(["GET"])
+def ticket_public_page(request: HttpRequest):
+    return render(request, "ticket_public.html")
+
+
+@require_http_methods(["GET"])
+def ticket_staff_page(request: HttpRequest):
+    return render(request, "ticket_staff.html")
 
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def login_session(request: HttpRequest) -> JsonResponse:
-    data = _parse_body(request)
-    user_id = data.get("user_id")
-    if not user_id:
-        return _bad_request("user_id requis")
-    session_data = session_service.create_session(str(user_id))
-    return JsonResponse(session_data, status=201)
+def ticket_start_day(request: HttpRequest) -> JsonResponse:
+    return JsonResponse(ticket_service.start_day())
 
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def touch_activity(request: HttpRequest) -> JsonResponse:
-    data = _parse_body(request)
-    session_id = data.get("session_id")
-    if not session_id:
-        return _bad_request("session_id requis")
-    updated = session_service.update_activity(str(session_id))
-    if not updated:
-        return _bad_request("session introuvable", status=404)
-    return JsonResponse(updated)
+def ticket_end_day(request: HttpRequest) -> JsonResponse:
+    return JsonResponse(ticket_service.end_day())
 
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def logout_session(request: HttpRequest) -> JsonResponse:
+def ticket_take(request: HttpRequest) -> JsonResponse:
     data = _parse_body(request)
-    session_id = data.get("session_id")
-    if not session_id:
-        return _bad_request("session_id requis")
-    ended = session_service.end_session(str(session_id))
-    if not ended:
-        return _bad_request("session introuvable", status=404)
-    return JsonResponse(ended)
+    # Limitation au service "poste" (fixé côté backend)
+    return JsonResponse(ticket_service.take_ticket(service_type="poste"), status=201)
 
 
 @require_http_methods(["GET"])
-def get_session_view(request: HttpRequest, session_id: str) -> JsonResponse:
-    session = session_service.get_session(session_id)
-    if not session:
-        return _bad_request("session introuvable", status=404)
-    return JsonResponse(session)
+def ticket_status(request: HttpRequest) -> JsonResponse:
+    return JsonResponse(ticket_service.get_status())
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def ticket_call_next(request: HttpRequest) -> JsonResponse:
+    return JsonResponse(ticket_service.call_next())
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def ticket_finish_current(request: HttpRequest) -> JsonResponse:
+    return JsonResponse(ticket_service.finish_current())
 
 
 @require_http_methods(["GET"])
-def dashboard_summary(request: HttpRequest) -> JsonResponse:
-    summary = session_service.get_active_sessions_summary()
-    return JsonResponse(summary)
-
-
-@require_http_methods(["GET"])
-def activity_leaderboard(request: HttpRequest) -> JsonResponse:
-    limit_param = request.GET.get("limit")
-    try:
-        limit = int(limit_param) if limit_param else 50
-    except ValueError:
-        return _bad_request("limit doit être un entier")
-    leaderboard = session_service.get_activity_leaderboard(limit=limit)
-    return JsonResponse({"leaderboard": leaderboard})
+def ticket_snapshot(request: HttpRequest) -> JsonResponse:
+    return JsonResponse(ticket_service.snapshot())

@@ -1,14 +1,16 @@
-# Real-Time User Session Activity Tracking (Django + Redis)
+# Gestion de Tickets en Temps Réel (Django + Redis)
 
-Backend Django qui utilise Redis comme base NoSQL principale (hash, set, sorted set, TTL) pour suivre en temps réel les sessions et l’activité des utilisateurs.
+Backend Django qui utilise Redis comme base NoSQL principale (LIST, HASH, STRING+TTL) pour gérer une file de tickets (poste) en temps réel : prise de ticket, appel, clôture, ouverture/fermeture quotidienne avec reset auto.
 
 ## Fonctionnalités
-- Création de session à la connexion (hash + TTL)
-- Mise à jour du `last_activity` à chaque action
-- Expiration automatique après inactivité
-- Gestion des utilisateurs en ligne (set)
-- Classement optionnel par activité (sorted set)
-- Endpoints API REST pour dashboard en temps réel
+- Prise de ticket (FIFO via LIST), métadonnées en HASH, numéro auto par jour
+- Appel du ticket suivant, clôture du ticket en cours
+- Ouverture/fermeture de journée (STRING de jour + TTL pour reset quotidien)
+- Logs des actions (start/end/take/call/finish) stockés dans Redis
+- Pages :
+  - Public : `/api/tickets/public` (prendre un ticket, voir son numéro et l’attente)
+  - Staff : `/api/tickets/staff` (Start/End Day, Call Next, Finish Current, stats live)
+  - Dashboard : `/api/dashboard` (statuts, file, logs et graphique actions en temps réel)
 
 ## Prérequis
 - Python 3.10+
@@ -23,8 +25,6 @@ pip install -r requirements.txt
 
 ## Variables d’environnement utiles
 - `REDIS_URL` (par défaut `redis://localhost:6379/0`)
-- `SESSION_TTL_SECONDS` (par défaut `1800`)
-- `ACTIVITY_SCORE_ENABLED` (1/0, par défaut 1)
 - `DJANGO_DEBUG` (1/0, par défaut 1)
 - `DJANGO_ALLOWED_HOSTS` (ex: `localhost,127.0.0.1`)
 
@@ -34,18 +34,24 @@ python manage.py runserver
 ```
 
 ## Endpoints (tous sous `/api/`)
-- `POST /api/sessions/login` body `{ "user_id": "u1" }`
-- `POST /api/sessions/activity` body `{ "session_id": "<uuid>" }`
-- `POST /api/sessions/logout` body `{ "session_id": "<uuid>" }`
-- `GET  /api/sessions/<session_id>`
-- `GET  /api/dashboard/summary`
-- `GET  /api/dashboard/leaderboard?limit=50`
+- `GET  /api/dashboard` (page dashboard tickets)
+- `GET  /api/tickets/public` (page publique)
+- `GET  /api/tickets/staff` (page staff)
+- `POST /api/tickets/start-day`
+- `POST /api/tickets/end-day`
+- `POST /api/tickets/take`
+- `GET  /api/tickets/status`
+- `POST /api/tickets/call-next`
+- `POST /api/tickets/finish-current`
+- `GET  /api/tickets/snapshot` (statuts + logs)
 
 ## Structure Redis
-- `HASH session:{session_id}` : user_id, login_time, last_activity, status
-- `STRING session:{session_id}:expire` : TTL pour expiration
-- `SET online_users` : utilisateurs en ligne
-- `SORTED SET user_activity_score` : score activité (optionnel)
+- `STRING tickets:{YYYY-MM-DD}:day` : marqueur de jour (TTL jusqu’à minuit)
+- `STRING tickets:{YYYY-MM-DD}:counter` : compteur de tickets du jour
+- `LIST   tickets:{YYYY-MM-DD}:queue` : file FIFO des tickets
+- `STRING tickets:{YYYY-MM-DD}:current` : ticket en cours
+- `HASH   tickets:{YYYY-MM-DD}:ticket:{n}` : détails ticket (status, time, service)
+- `LIST   tickets:{YYYY-MM-DD}:logs` : logs des actions (start/end/take/call/finish) max 50
 
 ## Notes
 - Pas de modèles SQL : Redis est le store principal.

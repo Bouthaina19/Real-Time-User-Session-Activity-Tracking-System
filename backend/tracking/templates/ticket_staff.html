@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Tickets - Staff</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --accent-2: #06b6d4;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --success: #16a34a;
+      --danger: #dc2626;
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 16px 20px;
+      background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(6,182,212,0.08));
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .title { font-size: 20px; font-weight: 800; }
+    .pill {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: #f9fafb;
+      font-size: 13px;
+    }
+    main { padding: 18px 20px 28px; display: grid; gap: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 12px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.04);
+    }
+    .card h2 { margin: 0 0 10px; font-size: 16px; }
+    .metric {
+      padding: 12px;
+      border-radius: 12px;
+      background: #f9fafb;
+      border: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+    .metric .label { color: var(--muted); font-size: 13px; }
+    .metric .value { font-size: 24px; font-weight: 800; }
+    .btn {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 10px 18px rgba(37,99,235,0.18);
+    }
+    .btn.danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .btn.secondary {
+      background: #fff;
+      color: var(--accent);
+      border: 1px solid var(--border);
+      box-shadow: none;
+    }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { color: var(--muted); font-size: 13px; }
+    .status { color: var(--muted); font-size: 13px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="pill">Service public — Staff</div>
+      <div class="title">Gestion des tickets</div>
+      <div class="status" id="status-text">En attente...</div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn secondary" id="btn-start">Start Day</button>
+      <button class="btn" id="btn-call">Call Next</button>
+      <button class="btn" id="btn-finish">Finish Current</button>
+      <button class="btn danger" id="btn-end">End Day</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="grid">
+      <div class="card">
+        <h2>État courant</h2>
+        <div class="metric">
+          <div class="label">Ticket en cours</div>
+          <div class="value" id="current-ticket">-</div>
+        </div>
+        <div class="metric">
+          <div class="label">Ticket suivant</div>
+          <div class="value" id="next-ticket">-</div>
+        </div>
+        <div class="metric">
+          <div class="label">En attente</div>
+          <div class="value" id="waiting-count">-</div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Ticket en cours (détails)</h2>
+        <div class="metric">
+          <div class="label">Numéro</div>
+          <div class="value" id="current-num">-</div>
+        </div>
+        <div class="metric">
+          <div class="label">Créé à</div>
+          <div class="value" id="current-time">-</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>File d’attente (top 10)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Ticket</th><th>Créé (horaire TN)</th><th>Status</th></tr>
+          </thead>
+          <tbody id="queue-body">
+            <tr><td colspan="3" class="status">Chargement...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const statusText = document.getElementById("status-text");
+    const btnStart = document.getElementById("btn-start");
+    const btnCall = document.getElementById("btn-call");
+    const btnFinish = document.getElementById("btn-finish");
+    const btnEnd = document.getElementById("btn-end");
+
+    const currentTicketEl = document.getElementById("current-ticket");
+    const nextTicketEl = document.getElementById("next-ticket");
+    const waitingCountEl = document.getElementById("waiting-count");
+    const currentNumEl = document.getElementById("current-num");
+    const currentTimeEl = document.getElementById("current-time");
+    const queueBody = document.getElementById("queue-body");
+    const fmt = (iso) => {
+      if (!iso) return "-";
+      try { return new Date(iso).toLocaleString("fr-FR", { timeZone: "Africa/Tunis" }); } catch (e) { return iso; }
+    };
+
+    function setStatus(text) { statusText.textContent = text; }
+
+    async function post(url) {
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" } });
+      return res.json();
+    }
+
+    // Son simple (bip) encodé en base64
+    const audioEl = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YRAAAAAg//8A//8A//8A//8A//8A//8A//8A//8A");
+    function playTone() {
+      try { audioEl.currentTime = 0; audioEl.play(); } catch (e) { console.warn("audio blocked", e); }
+    }
+    function speakWelcome() {
+      try {
+        const utter = new SpeechSynthesisUtterance("Bonjour, le service est ouvert");
+        utter.lang = "fr-FR"; utter.rate = 1;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utter);
+      } catch (e) { console.warn("speech synthesis not available", e); }
+    }
+
+    function speakTicket(ticketNum) {
+      if (!ticketNum) return;
+      try {
+        const utter = new SpeechSynthesisUtterance(`Ticket numéro ${ticketNum}`);
+        utter.lang = "fr-FR";
+        utter.rate = 1;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utter);
+      } catch (e) {
+        console.warn("speech synthesis not available", e);
+      }
+    }
+
+    let pollTimer = null;
+    async function refresh() {
+      try {
+        const data = await fetch("/api/tickets/snapshot").then(r => r.json());
+        const isOpen = data.open !== false;
+        currentTicketEl.textContent = isOpen ? (data.current_ticket ?? "-") : "Fermé";
+        nextTicketEl.textContent = isOpen ? (data.next_ticket ?? "-") : "-";
+        waitingCountEl.textContent = isOpen ? (data.waiting_tickets ?? "-") : "0";
+        btnCall.disabled = !isOpen;
+        btnFinish.disabled = !isOpen;
+        btnEnd.disabled = !isOpen ? true : false;
+        btnStart.classList.toggle("hidden", isOpen);
+        btnEnd.classList.toggle("hidden", !isOpen);
+
+        const cur = isOpen ? (data.current_ticket_data || {}) : {};
+        currentNumEl.textContent = isOpen ? (cur.ticket_number ?? data.current_ticket ?? "-") : "Fermé";
+        currentTimeEl.textContent = isOpen ? fmt(cur.creation_time_iso ?? cur.creation_time) : "-";
+
+        const list = isOpen ? (data.waiting_list || []) : [];
+        if (!list.length) {
+          queueBody.innerHTML = `<tr><td colspan="3" class="status">Aucun ticket en attente.</td></tr>`;
+        } else {
+          queueBody.innerHTML = list.map(item => `
+            <tr>
+              <td>${item.ticket_number ?? item.ticket_number === 0 ? item.ticket_number : "-"}</td>
+              <td>${fmt(item.creation_time_iso ?? item.creation_time)}</td>
+              <td>${item.status ?? "-"}</td>
+            </tr>
+          `).join("");
+        }
+        setStatus("Mis à jour : " + new Date().toLocaleTimeString());
+      } catch (e) {
+        console.error(e);
+        setStatus("Erreur de rafraîchissement");
+      }
+    }
+
+    function startPolling() {
+      stopPolling();
+      refresh();
+      pollTimer = setInterval(refresh, 1000);
+    }
+    function stopPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    btnStart.addEventListener("click", async () => { setStatus("Init jour..."); await post("/api/tickets/start-day"); await refresh(); });
+    btnCall.addEventListener("click", async () => {
+      setStatus("Appel ticket...");
+      const data = await post("/api/tickets/call-next");
+      if (data.current_ticket) {
+        playTone();
+        speakTicket(data.current_ticket);
+      }
+      await refresh();
+    });
+    btnFinish.addEventListener("click", async () => { setStatus("Clôture ticket..."); await post("/api/tickets/finish-current"); await refresh(); });
+    btnEnd.addEventListener("click", async () => { setStatus("Fin de journée..."); await post("/api/tickets/end-day"); await refresh(); });
+
+    startPolling();
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stopPolling();
+      else startPolling();
+    });
+  </script>
+</body>
+</html>
