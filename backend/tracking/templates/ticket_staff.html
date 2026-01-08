@@ -314,6 +314,13 @@
       setTimeout(() => toastEl.classList.remove("show"), 2000);
     }
     function setStatus(text) { statusText.textContent = text; }
+    function resetTicketDisplay({ closed = false } = {}) {
+      nowTicketEl.textContent = closed ? "Fermé" : "—";
+      nowTimeEl.textContent = "--:--";
+      queueList.innerHTML = closed
+        ? '<div class="status-text">Service fermé.</div>'
+        : '<div class="status-text">En attente...</div>';
+    }
 
     const audioEl = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YRAAAAAg//8A//8A//8A//8A//8A//8A//8A//8A");
     function playTone() { try { audioEl.currentTime = 0; audioEl.play(); } catch (e) {} }
@@ -416,10 +423,12 @@
     confirmCancel.addEventListener("click", () => modal.classList.remove("show"));
     confirmYes.addEventListener("click", async () => {
       modal.classList.remove("show");
+      resetTicketDisplay({ closed: true });
       await postAction("/api/tickets/end-day", "Journée terminée");
     });
 
     btnStart.addEventListener("click", async () => {
+      resetTicketDisplay({ closed: false });
       await postAction("/api/tickets/start-day", "Journée démarrée");
       speakWelcome();
     });
