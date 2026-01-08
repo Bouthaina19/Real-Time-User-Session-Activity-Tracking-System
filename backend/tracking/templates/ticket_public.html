@@ -3,184 +3,289 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Prendre un ticket</title>
+  <title>Ticket Service System — Public</title>
   <style>
     :root {
-      --bg: #f5f7fb;
+      --bg: #f6f8fb;
       --card: #ffffff;
       --accent: #2563eb;
       --accent-2: #06b6d4;
-      --text: #111827;
-      --muted: #6b7280;
-      --border: #e5e7eb;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 16px 32px rgba(15,23,42,0.08);
+      --danger: #ef4444;
+      --success: #16a34a;
     }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
-      display: flex;
-      justify-content: center;
-      align-items: center;
       min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       padding: 16px;
     }
-    .card {
+    .shell {
+      width: min(960px, 100%);
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 18px;
+      box-shadow: var(--shadow);
       padding: 20px;
-      max-width: 420px;
-      width: 100%;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      display: grid;
+      gap: 16px;
     }
-    h1 { margin: 0 0 12px; }
-    .btn {
-      width: 100%;
-      padding: 12px 14px;
-      border: none;
-      border-radius: 10px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #fff;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 10px 20px rgba(37,99,235,0.18);
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
     }
-    .btn:disabled { opacity: 0.7; cursor: not-allowed; }
+    .title { font-size: 22px; font-weight: 800; margin: 0; }
     .pill {
-      display: inline-block;
-      padding: 6px 12px;
-      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
       border: 1px solid var(--border);
-      color: var(--muted);
-      background: #f9fafb;
-      font-size: 13px;
-    }
-    .ticket {
-      margin-top: 14px;
-      padding: 16px;
       background: #fff;
-      color: #111827;
-      border-radius: 12px;
-      text-align: center;
-      font-weight: 800;
-      font-size: 28px;
-      letter-spacing: 2px;
-      box-shadow: inset 0 0 0 2px #e5e7eb;
+      color: var(--muted);
+      font-weight: 600;
     }
-    .row { margin: 10px 0; color: var(--muted); }
-    select {
+    .pill .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+    .pill.green .dot { background: var(--success); }
+    .pill.red .dot { background: var(--danger); }
+    main { display: grid; gap: 16px; }
+    .hero {
+      background: linear-gradient(135deg, rgba(37,99,235,0.10), rgba(6,182,212,0.12));
+      border: 1px solid rgba(37,99,235,0.15);
+      border-radius: 16px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 14px;
+    }
+    .hero-left { display: grid; gap: 10px; }
+    .big-button {
       width: 100%;
-      padding: 10px;
-      border-radius: 10px;
+      padding: 18px;
+      font-size: 26px;
+      font-weight: 900;
+      color: #fff;
+      background: linear-gradient(135deg, #2563eb, #06b6d4);
+      border: none;
+      border-radius: 14px;
+      box-shadow: 0 20px 40px rgba(37,99,235,0.25);
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+    }
+    .big-button:hover { transform: translateY(-1px); }
+    .big-button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .ticket-paper {
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      background: #fff;
+      padding: 14px;
+      text-align: center;
+      display: grid;
+      gap: 6px;
+      box-shadow: inset 0 0 0 1px #eef2ff;
+    }
+    .ticket-label { color: var(--muted); font-weight: 700; letter-spacing: 0.6px; }
+    .ticket-number { font-size: 48px; font-weight: 900; letter-spacing: 2px; }
+    .ticket-meta { color: var(--muted); font-size: 14px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 10px; }
+    .card {
       border: 1px solid var(--border);
-      background: #f9fafb;
-      color: var(--text);
-      margin-bottom: 12px;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+    .card h3 { margin: 0 0 6px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .card .value { font-size: 26px; font-weight: 800; }
+    .card .sub { color: var(--muted); font-size: 12px; }
+    .info-redis {
+      font-size: 14px;
+      color: var(--muted);
+      background: #f8fafc;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      display: grid;
+      gap: 4px;
     }
     .toast {
       position: fixed;
-      bottom: 16px;
-      right: 16px;
-      background: #10b981;
+      bottom: 20px; right: 20px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #111827;
       color: #fff;
-      padding: 10px 14px;
-      border-radius: 10px;
-      box-shadow: 0 12px 30px rgba(16,185,129,0.25);
-      font-weight: 700;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: all 0.25s ease;
-      pointer-events: none;
-      z-index: 20;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+      opacity: 0; transform: translateY(10px);
+      transition: opacity 160ms ease, transform 160ms ease;
+      z-index: 50;
+      font-weight: 800;
     }
-    .toast.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .subtext { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: #16a34a; }
+    .toast.warn { background: #f59e0b; color: #111827; }
+    .toast.info { background: #2563eb; }
     .closed-banner {
-      margin-top: 12px;
+      text-align: center;
       padding: 14px;
       background: #fee2e2;
       color: #991b1b;
       border: 1px solid #fecaca;
-      border-radius: 10px;
-      font-weight: 700;
-      text-align: center;
+      border-radius: 12px;
+      font-weight: 800;
       display: none;
     }
     .closed-banner.show { display: block; }
+    @media (max-width: 760px) {
+      .hero { grid-template-columns: 1fr; }
+      .big-button { font-size: 22px; }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="pill">Service public — Prendre un ticket</div>
-    <h1>Bienvenue</h1>
-    <div style="margin-bottom:12px; color: var(--muted);">Service: Poste</div>
+  <div class="shell">
+    <header>
+      <div>
+        <div class="title">Ticket Service System</div>
+        <div class="pill" id="pill-date">📅 <span id="date"></span> — <span id="time"></span></div>
+      </div>
+      <div class="pill" id="pill-open"><span class="dot"></span><span id="status-label">-</span></div>
+    </header>
 
-    <button class="btn" id="btn-ticket">Prendre un ticket</button>
+    <main>
+      <div class="hero">
+        <div class="hero-left">
+          <div style="font-size:16px; font-weight:700;">Service Poste</div>
+          <button class="big-button" id="btn-ticket">Prendre un ticket</button>
+          <div class="closed-banner" id="closed-banner">Service fermé, revenez demain.</div>
+        </div>
+        <div class="ticket-paper" id="ticket-area">
+          <div class="ticket-label">Votre ticket</div>
+          <div class="ticket-number" id="ticket-number">---</div>
+          <div class="ticket-meta">Personnes avant vous : <span id="before">-</span></div>
+          <div class="ticket-meta">Attente estimée : <span id="eta">-</span></div>
+        </div>
+      </div>
 
-    <div id="ticket-area" style="margin-top:16px;">
-      <div class="ticket" id="ticket-number">---</div>
-      <div class="row">Personnes avant vous : <span id="before">-</span></div>
-      <div class="row">Ticket en cours : <span id="current">-</span></div>
-    </div>
-    <div class="closed-banner" id="closed-banner">Service fermé, revenez demain.</div>
+      <div class="cards">
+        <div class="card">
+          <h3>Ticket en cours</h3>
+          <div class="value" id="current">-</div>
+          <div class="sub">Actualisé en temps réel (Redis)</div>
+        </div>
+        <div class="card">
+          <h3>En attente</h3>
+          <div class="value" id="waiting">-</div>
+          <div class="sub">Personnes dans la file</div>
+        </div>
+        <div class="card">
+          <h3>Total du jour</h3>
+          <div class="value" id="total">-</div>
+          <div class="sub">Tickets générés aujourd’hui</div>
+        </div>
+      </div>
+    </main>
   </div>
-  <div class="toast" id="toast">Ticket pris !</div>
+
+  <div class="toast" id="toast">Ticket pris</div>
 
   <script>
+    // Elements
     const btn = document.getElementById("btn-ticket");
     const ticketNumberEl = document.getElementById("ticket-number");
     const beforeEl = document.getElementById("before");
+    const etaEl = document.getElementById("eta");
     const currentEl = document.getElementById("current");
+    const waitingEl = document.getElementById("waiting");
+    const totalEl = document.getElementById("total");
     const toastEl = document.getElementById("toast");
     const closedBanner = document.getElementById("closed-banner");
+    const statusLabel = document.getElementById("status-label");
+    const pillOpen = document.getElementById("pill-open");
+    const dateEl = document.getElementById("date");
+    const timeEl = document.getElementById("time");
+
     let isOpen = true;
     let hasTicket = false;
+    let pollTimer = null;
 
-    // Son simple de confirmation (bip léger)
+    // Simple audio feedback
     const audioEl = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YRAAAAAg//8A//8A//8A//8A//8A//8A//8A//8A");
-    function playTone() {
-      try { audioEl.currentTime = 0; audioEl.play(); } catch (e) {}
-    }
+    function playTone() { try { audioEl.currentTime = 0; audioEl.play(); } catch (e) {} }
 
-    function showToast(message) {
+    function showToast(message, type="info") {
       toastEl.textContent = message;
-      toastEl.classList.add("show");
+      toastEl.className = "toast show " + type;
       setTimeout(() => toastEl.classList.remove("show"), 2000);
     }
 
-    let pollTimer = null;
-    async function refreshStatus() {
+    function formatEta(seconds) {
+      if (seconds == null) return "-";
+      const m = Math.floor(seconds / 60);
+      const s = Math.round(seconds % 60);
+      return `${m}m ${s}s`;
+    }
+
+    async function refresh() {
       try {
-        const res = await fetch("/api/tickets/status");
+        const res = await fetch("/api/tickets/snapshot");
         const data = await res.json();
         isOpen = data.open !== false;
         const waitingRaw = data.waiting_tickets ?? 0;
-        const displayWaiting = hasTicket ? Math.max(waitingRaw - 1, 0) : waitingRaw;
-        beforeEl.textContent = displayWaiting;
-        currentEl.textContent = data.current_ticket ?? "-";
+
+        // Header status
+        statusLabel.textContent = isOpen ? "Ouvert" : "Fermé";
+        pillOpen.classList.remove("green", "red");
+        pillOpen.classList.add(isOpen ? "green" : "red");
+
+        // KPIs
+        currentEl.textContent = isOpen ? (data.current_ticket ?? "—") : "Fermé";
+        waitingEl.textContent = isOpen ? waitingRaw : 0;
+        totalEl.textContent = isOpen ? (data.total_tickets ?? 0) : 0;
+
+        // If user already has a ticket, show waiting_before = waitingRaw - 1 (we count current)
+        const waitingBefore = hasTicket ? Math.max(waitingRaw - 1, 0) : waitingRaw;
+        beforeEl.textContent = waitingBefore;
+
+        // ETA based on avg_wait_seconds from Redis snapshot (else fallback 30s per ticket)
+        const avg = data.avg_wait_seconds;
+        const estimate = avg != null ? avg * (waitingBefore || 1) : (waitingBefore * 30);
+        etaEl.textContent = isOpen ? formatEta(estimate) : "-";
+
         btn.disabled = !isOpen;
         closedBanner.classList.toggle("show", !isOpen);
         if (!isOpen) {
           ticketNumberEl.textContent = "Fermé";
           hasTicket = false;
-        }
-        if (isOpen && ticketNumberEl.textContent === "Fermé") {
+        } else if (ticketNumberEl.textContent === "Fermé") {
           ticketNumberEl.textContent = "---";
           hasTicket = false;
         }
       } catch (e) {
         console.error(e);
+        showToast("Erreur de mise à jour", "warn");
       }
     }
+
     function startPolling() {
       stopPolling();
-      refreshStatus();
-      pollTimer = setInterval(refreshStatus, 1000);
+      refresh();
+      pollTimer = setInterval(refresh, 2000);
     }
     function stopPolling() {
       if (pollTimer) clearInterval(pollTimer);
@@ -189,38 +294,47 @@
 
     btn.addEventListener("click", async () => {
       if (!isOpen) {
-        showToast("Service fermé, revenez demain");
+        showToast("Service fermé, revenez demain", "warn");
         return;
       }
       btn.disabled = true;
+      const prevText = btn.textContent;
+      btn.textContent = "Génération...";
       try {
-        const res = await fetch("/api/tickets/take", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({})
-        });
+        const res = await fetch("/api/tickets/take", { method: "POST" });
         const data = await res.json();
         if (data.closed) {
-          showToast(data.message || "Service fermé, revenez demain");
+          showToast(data.message || "Service fermé", "warn");
+          ticketNumberEl.textContent = "Fermé";
+          hasTicket = false;
         } else {
           ticketNumberEl.textContent = data.ticket?.ticket_number ?? "---";
           beforeEl.textContent = data.waiting_before ?? "-";
           hasTicket = true;
-          showToast("Ticket pris. Patientez, écoutez l’appel.");
           playTone();
-          await refreshStatus();
+          showToast("Ticket pris", "success");
+          await refresh();
         }
       } catch (e) {
         console.error(e);
+        showToast("Erreur, réessayez", "warn");
       } finally {
         btn.disabled = false;
+        btn.textContent = prevText;
       }
     });
 
+    function tickClock() {
+      const now = new Date();
+      dateEl.textContent = now.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long" });
+      timeEl.textContent = now.toLocaleTimeString("fr-FR");
+    }
+    setInterval(tickClock, 1000);
+    tickClock();
+
     startPolling();
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) stopPolling();
-      else startPolling();
+      if (document.hidden) stopPolling(); else startPolling();
     });
   </script>
 </body>

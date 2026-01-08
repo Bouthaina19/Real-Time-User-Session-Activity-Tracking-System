@@ -228,12 +228,22 @@ def snapshot():
             avg_wait_seconds = sum(deltas) / len(deltas)
 
     key_count = 0
+    hash_count = 0
+    ttl_seconds = _ttl_until_tomorrow() if open_flag else None
     if open_flag:
         cursor = 0
-        pattern = f"{k['day'].split(':day')[0]}*"
+        pattern_base = f"{k['day'].split(':day')[0]}"
         while True:
-            cursor, keys = r.scan(cursor=cursor, match=pattern, count=200)
+            cursor, keys = r.scan(cursor=cursor, match=f"{pattern_base}*", count=200)
             key_count += len(keys)
+            if cursor == 0 or cursor == "0":
+                break
+        # count ticket hashes only
+        cursor = 0
+        hash_pattern = f"{k['hash_prefix']}:*"
+        while True:
+            cursor, keys = r.scan(cursor=cursor, match=hash_pattern, count=200)
+            hash_count += len(keys)
             if cursor == 0 or cursor == "0":
                 break
 
@@ -250,4 +260,6 @@ def snapshot():
         "total_tickets": int(r.get(k["counter"]) or 0) if open_flag else 0,
         "avg_wait_seconds": avg_wait_seconds,
         "key_count": key_count,
+        "hash_count": hash_count,
+        "ttl_seconds": ttl_seconds,
     }
