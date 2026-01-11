@@ -11,17 +11,15 @@ class Ticket:
     ticket_number: int
     creation_time: float
     service_type: str | None
-    status: str  # waiting | in_progress | completed
+    status: str
 
     def to_dict(self) -> dict:
         data = asdict(self)
-        # Format convenience: add iso time
         data["creation_time_iso"] = datetime.fromtimestamp(self.creation_time, tz=timezone.utc).isoformat()
         return data
 
 
 def _today_key() -> str:
-    # UTC-based day boundary
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
@@ -38,7 +36,7 @@ def _keys(day: str) -> dict:
         "counter": f"{base}:counter",
         "queue": f"{base}:queue",
         "current": f"{base}:current",
-        "hash_prefix": f"{base}:ticket",  # full key: {hash_prefix}:{ticket_number}
+        "hash_prefix": f"{base}:ticket",  # {ticket_number}
         "logs": f"{base}:logs",
     }
 
@@ -50,10 +48,8 @@ def _ticket_hash_key(day: str, num: int) -> str:
 def _ensure_day(r, day: str):
     k = _keys(day)
     ttl = _ttl_until_tomorrow()
-    # set day marker + counter if absent
     r.set(k["day"], day, ex=ttl, nx=True)
     r.set(k["counter"], 0, ex=ttl, nx=True)
-    # ensure TTL refreshed on queue/current too
     r.expire(k["queue"], ttl)
     r.expire(k["current"], ttl)
     r.expire(k["logs"], ttl)
@@ -80,9 +76,7 @@ def end_day():
     r = get_redis()
     day = _today_key()
     k = _keys(day)
-    # delete all per-day keys (queue, counter, current, marker, hashes)
     pipe = r.pipeline()
-    # delete hashes by scan
     cursor = "0"
     pattern = f"{k['hash_prefix']}:*"
     while True:
@@ -100,10 +94,8 @@ def take_ticket(service_type: str | None = None) -> dict:
     r = get_redis()
     day = _today_key()
     k = _keys(day)
-    # day must exist (set by start_day); do not auto-create
     if not r.exists(k["day"]):
         return {"closed": True, "message": "Service fermé, revenez demain"}
-    # refresh TTL and structure
     _ensure_day(r, day)
     ttl = _ttl_until_tomorrow()
     queue_len_before = r.llen(k["queue"])
@@ -136,7 +128,6 @@ def _get_ticket(day: str, num: int) -> dict | None:
     data = r.hgetall(_ticket_hash_key(day, num))
     if not data:
         return None
-    # hgetall returns strings; keep as is for frontend
     return data
 
 
@@ -194,7 +185,6 @@ def finish_current():
 
 
 def snapshot():
-    """Return a richer snapshot for dashboards."""
     r = get_redis()
     day = _today_key()
     k = _keys(day)
@@ -203,8 +193,7 @@ def snapshot():
     current = r.get(k["current"]) if open_flag else None
     next_ticket = r.lindex(k["queue"], 0) if open_flag else None
 
-    # fetch waiting tickets (cap to avoid huge payload)
-    waiting_list = r.lrange(k["queue"], 0, 49) if open_flag else []  # top 50 for UI
+    waiting_list = r.lrange(k["queue"], 0, 49) if open_flag else []  
     waiting_details = []
     for num in waiting_list:
         data = _get_ticket(day, int(num)) or {}
@@ -213,7 +202,6 @@ def snapshot():
     current_data = _get_ticket(day, int(current)) if current else None
     logs = r.lrange(k["logs"], 0, 19)
 
-    # Compute average waiting time (seconds) for items we have
     avg_wait_seconds = None
     if open_flag and waiting_details:
         now = datetime.now(timezone.utc).timestamp()
@@ -238,7 +226,6 @@ def snapshot():
             key_count += len(keys)
             if cursor == 0 or cursor == "0":
                 break
-        # count ticket hashes only
         cursor = 0
         hash_pattern = f"{k['hash_prefix']}:*"
         while True:

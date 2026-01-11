@@ -18,15 +18,7 @@ def _parse_body(request: HttpRequest) -> dict:
 
 @require_http_methods(["GET"])
 def realtime_dashboard_page(request: HttpRequest):
-    """
-    Page autonome pour le suivi temps réel des tickets.
-    """
     return render(request, "dashboard.html", {})
-
-
-# --------------------------
-# Ticketing (Redis queue)
-# --------------------------
 
 
 @require_http_methods(["GET"])
@@ -55,7 +47,6 @@ def ticket_end_day(request: HttpRequest) -> JsonResponse:
 @require_http_methods(["POST"])
 def ticket_take(request: HttpRequest) -> JsonResponse:
     data = _parse_body(request)
-    # Limitation au service "poste" (fixé côté backend)
     return JsonResponse(ticket_service.take_ticket(service_type="poste"), status=201)
 
 
